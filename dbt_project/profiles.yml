@@ -1,0 +1,8 @@
+newssentinel_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: '../newssentinel.duckdb'
+      extensions:
+        - parquet

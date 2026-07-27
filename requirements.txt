@@ -1,0 +1,14 @@
+fastapi>=0.110.0
+uvicorn>=0.29.0
+requests>=2.31.0
+confluent-kafka>=2.3.0
+deltalake>=0.17.0
+duckdb>=0.10.0
+dbt-duckdb>=1.7.0
+vaderSentiment>=3.3.2
+langchain>=0.1.16
+langchain-community>=0.0.34
+langchain-google-genai>=1.0.3
+chromadb>=0.4.24
+plotly>=5.20.0
+python-dotenv>=1.0.1

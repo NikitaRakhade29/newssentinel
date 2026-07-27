@@ -1,0 +1,20 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Data & Lakehouse
+data/
+*.duckdb
+*.duckdb.wal
+
+# IDE / System
+.vscode/
+.idea/
+.DS_Store
+
+# dbt
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/

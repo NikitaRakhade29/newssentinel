@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: stg_news
+    description: "Staging table for raw HackerNews story events"
+    columns:
+      - name: story_id
+        description: "Unique story identifier"
+        tests:
+          - unique
+          - not_null
+      - name: title
+        description: "Article title text"
+        tests:
+          - not_null
+      - name: sentiment_label
+        description: "Categorical sentiment classification"
+        tests:
+          - accepted_values:
+              values: ['Positive', 'Neutral', 'Negative']
+
+  - name: fct_topic_sentiment_summary
+    description: "Gold analytical mart providing aggregated sentiment stats"
+    columns:
+      - name: sentiment_label
+        tests:
+          - unique
+          - not_null
