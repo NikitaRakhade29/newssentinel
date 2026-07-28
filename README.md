@@ -12,7 +12,9 @@ NewsSentinel is an enterprise-grade real-time streaming data platform that inges
 
 ## Dashboard Preview & Features
 
-![NewsSentinel Market Intelligence Console](docs/images/dashboard_preview.svg)
+![NewsSentinel Metrics & Visual Analytics](docs/images/dashboard_analytics.png)
+
+![NewsSentinel Real-Time Live Stream Feed](docs/images/dashboard_table.png)
 
 - **Executive KPI Metrics**: Live count of total unique stories, average sentiment compound score, positive market signals, and negative risk indicators.
 - **Interactive Visual Analytics**:
