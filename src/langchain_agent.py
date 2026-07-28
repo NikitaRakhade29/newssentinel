@@ -20,9 +20,10 @@ SAMPLE_STORIES = [
 ]
 
 def query_database(user_query):
-    query_lower = user_query.lower()
+    query_str = user_query.strip()
+    query_lower = query_str.lower()
     
-    # Try reading from DuckDB
+    # Load dataset from DuckDB, Delta Lake, or Sample
     df = pd.DataFrame()
     if os.path.exists(DB_PATH):
         try:
@@ -32,7 +33,6 @@ def query_database(user_query):
         except Exception:
             pass
             
-    # Try reading from Delta Parquet
     if df.empty and os.path.exists(DELTA_PATH):
         try:
             conn = duckdb.connect()
@@ -43,23 +43,28 @@ def query_database(user_query):
         except Exception:
             pass
             
-    # Fallback to Sample Dataset
     if df.empty:
         df = pd.DataFrame(SAMPLE_STORIES)
         
-    # Apply filtering based on query
+    # Search logic: check exact keyword in title first
     if "positive" in query_lower:
         filtered = df[df['sentiment_label'] == 'Positive'].sort_values('upvotes', ascending=False).head(5)
-    elif "negative" in query_lower:
+    elif "negative" in query_lower or "risk" in query_lower:
         filtered = df[df['sentiment_label'] == 'Negative'].sort_values('upvotes', ascending=False).head(5)
     elif "top" in query_lower or "popular" in query_lower or "upvote" in query_lower:
         filtered = df.sort_values('upvotes', ascending=False).head(5)
     else:
-        filtered = df.head(5)
-        
+        # Search title for user keyword
+        matched = df[df['title'].str.contains(query_lower, case=False, na=False)]
+        if not matched.empty:
+            filtered = matched.sort_values('upvotes', ascending=False).head(5)
+        else:
+            return f"No news stories found matching keyword '{query_str}'.\n\nTry searching for topics like: 'AI', 'NVIDIA', 'Cloud', 'Apple', 'Python', 'Positive', 'Negative', or 'Top News'."
+            
     rows = []
-    for _, r in filtered.iterrows():
-        rows.append(f"• [{r['sentiment_label']}] {r['title']} (Upvotes: {r['upvotes']})")
+    for idx, (_, r) in enumerate(filtered.iterrows(), start=1):
+        label_str = "Positive Market Signal" if r['sentiment_label'] == 'Positive' else ("Negative Risk Factor" if r['sentiment_label'] == 'Negative' else "Neutral Insight")
+        rows.append(f"{idx}. [{label_str}] {r['title']} (Community Engagement: {r['upvotes']} upvotes).")
         
     summary_text = "\n".join(rows)
     
@@ -71,15 +76,17 @@ def query_database(user_query):
             llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_KEY)
             prompt = PromptTemplate(
                 input_variables=["query", "data"],
-                template="You are NewsSentinel AI Market Analyst. Provide a clean summary without markdown asterisks (**).\n\nQuery: {query}\n\nData:\n{data}\n\nSummary:"
+                template="You are NewsSentinel AI Market Analyst. Rewrite the following market findings into clean, professional, human-readable bullet sentences.\n\nQuery: {query}\n\nData:\n{data}\n\nSummary:"
             )
-            res = (prompt | llm).invoke({"query": user_query, "data": summary_text})
+            res = (prompt | llm).invoke({"query": query_str, "data": summary_text})
             clean_res = res.content.replace("**", "").replace("###", "").replace("*", "")
             return clean_res
         except Exception:
             pass
             
-    return f"LangChain Market Intelligence Summary for '{user_query}':\n\n{summary_text}"
+    return f"Market Intelligence Briefing for '{query_str}':\n\n{summary_text}"
 
 if __name__ == "__main__":
-    print(query_database("Show top positive tech news"))
+    print(query_database("moon"))
+    print("---")
+    print(query_database("AI"))
