@@ -1,4 +1,5 @@
 import os
+import re
 import duckdb
 import pandas as pd
 from dotenv import load_dotenv
@@ -20,24 +21,20 @@ DEFAULT_STORIES = [
 ]
 
 def load_all_stories():
-    stories = []
-    
-    # Check DuckDB
     if os.path.exists(DB_PATH):
         try:
             conn = duckdb.connect(DB_PATH, read_only=True)
-            df = conn.execute("SELECT * FROM stg_news").fetchdf()
+            df = conn.execute("SELECT * FROM stg_news ORDER BY published_at DESC").fetchdf()
             conn.close()
             if not df.empty:
                 return df
         except Exception:
             pass
             
-    # Check Delta Lake Parquet
     if os.path.exists(DELTA_PATH):
         try:
             conn = duckdb.connect()
-            df = conn.execute(f"SELECT * FROM read_parquet('{DELTA_PATH}/*.parquet')").fetchdf()
+            df = conn.execute(f"SELECT * FROM read_parquet('{DELTA_PATH}/*.parquet') ORDER BY created_at DESC").fetchdf()
             conn.close()
             if not df.empty:
                 df['upvotes'] = df['score']
@@ -46,6 +43,14 @@ def load_all_stories():
             pass
             
     return pd.DataFrame(DEFAULT_STORIES)
+
+def match_topic_word(title, query):
+    # Fix substring bug: match whole words using regex word boundaries
+    if query.lower() == 'ai':
+        pattern = r'\b(ai|llm|gpt|openai|claude|gemini|machine learning|artificial intelligence|model|models)\b'
+    else:
+        pattern = r'\b' + re.escape(query.lower()) + r'\b'
+    return bool(re.search(pattern, title.lower()))
 
 def query_database(user_query):
     query_str = user_query.strip()
@@ -63,26 +68,26 @@ def query_database(user_query):
     elif "top" in query_lower or "popular" in query_lower or "upvote" in query_lower:
         matched = df.sort_values('upvotes', ascending=False)
     else:
-        matched = df[df['title'].str.contains(query_lower, case=False, na=False)]
+        # Use regex word boundary matching to avoid matching 'braid' or 'faithful' for 'AI'
+        matched = df[df['title'].apply(lambda t: match_topic_word(t, query_str))]
         
-    # If no match in current dataset, fallback to top stories and explain
+    is_fallback = False
     if matched.empty:
-        matched = df.head(5)
+        matched = df.sort_values('upvotes', ascending=False).head(5)
         is_fallback = True
-    else:
-        is_fallback = False
 
     filtered = matched.head(5)
     
     rows = []
     for idx, (_, r) in enumerate(filtered.iterrows(), start=1):
         upvotes_val = r.get('upvotes', r.get('score', 100))
-        rows.append(f"{idx}. [{r['sentiment_label']}] {r['title']} (Upvotes: {upvotes_val})")
+        label_str = "Positive Market Signal" if r['sentiment_label'] == 'Positive' else ("Negative Risk Factor" if r['sentiment_label'] == 'Negative' else "Neutral Tech News")
+        rows.append(f"{idx}. [{label_str}] {r['title']} (Upvotes: {upvotes_val})")
         
     summary_text = "\n".join(rows)
     
     if is_fallback:
-        header = f"No direct match for '{query_str}' in current stories stream. Displaying top trending market news:\n"
+        header = f"No direct stories matching '{query_str}' in live stream. Showing top trending tech news:\n"
     else:
         header = f"Market Intelligence Briefing for '{query_str}':\n"
         
@@ -96,7 +101,7 @@ def query_database(user_query):
             llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_KEY)
             prompt = PromptTemplate(
                 input_variables=["query", "data"],
-                template="You are NewsSentinel AI Market Analyst. Provide a clean summary without markdown asterisks (**).\n\nQuery: {query}\n\nData:\n{data}\n\nSummary:"
+                template="You are NewsSentinel AI Market Analyst. Rewrite the following market findings into clean, professional, human-readable bullet sentences.\n\nQuery: {query}\n\nData:\n{data}\n\nSummary:"
             )
             res = (prompt | llm).invoke({"query": query_str, "data": summary_text})
             clean_res = res.content.replace("**", "").replace("###", "").replace("*", "")
@@ -107,6 +112,4 @@ def query_database(user_query):
     return final_output
 
 if __name__ == "__main__":
-    print(query_database("NVIDIA"))
-    print("---")
-    print(query_database("moon"))
+    print(query_database("AI"))
