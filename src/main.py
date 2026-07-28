@@ -190,16 +190,16 @@ def dashboard_ui():
 
             <!-- Visual Charts Row -->
             <div class="row g-3 mb-4">
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <div class="card p-3">
                         <h5 class="card-title">📊 Sentiment Distribution</h5>
-                        <div id="pieChart" style="height: 300px;"></div>
+                        <div id="pieChart" style="height: 380px;"></div>
                     </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-7">
                     <div class="card p-3">
                         <h5 class="card-title">🔥 Top Upvoted Tech Stories</h5>
-                        <div id="barChart" style="height: 300px;"></div>
+                        <div id="barChart" style="height: 380px;"></div>
                     </div>
                 </div>
             </div>
@@ -267,10 +267,11 @@ def dashboard_ui():
                         values: [analytics.positive, analytics.neutral, analytics.negative],
                         labels: ['Positive', 'Neutral', 'Negative'],
                         type: 'pie',
+                        hole: 0.4,
                         marker: { colors: ['#2ecc71', '#95a5a6', '#e74c3c'] }
                     }];
-                    const pieLayout = { margin: {t: 10, b: 10, l: 10, r: 10}, paper_bgcolor: 'rgba(0,0,0,0)', font: {color: '#ffffff'} };
-                    Plotly.newPlot('pieChart', pieData, pieLayout);
+                    const pieLayout = { margin: {t: 20, b: 20, l: 20, r: 20}, paper_bgcolor: 'rgba(0,0,0,0)', font: {color: '#ffffff'} };
+                    Plotly.newPlot('pieChart', pieData, pieLayout, {displayModeBar: false, responsive: true});
 
                     const sRes = await fetch('/api/stories?limit=50');
                     const data = await sRes.json();
@@ -281,13 +282,21 @@ def dashboard_ui():
                     const topStories = [...allStories].sort((a,b) => b.upvotes - a.upvotes).slice(0, 6);
                     const barData = [{
                         x: topStories.map(s => s.upvotes),
-                        y: topStories.map(s => s.title.length > 30 ? s.title.substring(0,30) + '...' : s.title),
+                        y: topStories.map(s => s.title.length > 40 ? s.title.substring(0,40) + '...' : s.title),
                         type: 'bar',
                         orientation: 'h',
+                        text: topStories.map(s => s.upvotes),
+                        textposition: 'outside',
                         marker: { color: '#58a6ff' }
                     }];
-                    const barLayout = { margin: {t: 10, b: 30, l: 180, r: 10}, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: {color: '#ffffff'}, yaxis: {autorange: 'reversed'} };
-                    Plotly.newPlot('barChart', barData, barLayout);
+                    const barLayout = { 
+                        margin: {t: 20, b: 30, l: 280, r: 60}, 
+                        paper_bgcolor: 'rgba(0,0,0,0)', 
+                        plot_bgcolor: 'rgba(0,0,0,0)', 
+                        font: {color: '#ffffff'}, 
+                        yaxis: {autorange: 'reversed', automargin: true} 
+                    };
+                    Plotly.newPlot('barChart', barData, barLayout, {displayModeBar: false, responsive: true});
 
                 } catch(e) {
                     console.error(e);
