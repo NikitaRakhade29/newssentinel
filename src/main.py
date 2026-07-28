@@ -21,13 +21,13 @@ DB_PATH = "newssentinel.duckdb"
 DELTA_PATH = "./data/bronze_news"
 
 SAMPLE_STORIES = [
-    {"title": "NVIDIA Launches Next-Gen Blackwell Ultra Chips for Generative AI", "author": "tech_insider", "upvotes": 450, "comment_count": 85, "sentiment_label": "Positive", "sentiment_score": 0.65, "published_at": "2026-07-28T02:00:00"},
-    {"title": "OpenAI Releases GPT-4.5 with Enhanced Reasoning Capabilities", "author": "ai_dev", "upvotes": 620, "comment_count": 140, "sentiment_label": "Positive", "sentiment_score": 0.72, "published_at": "2026-07-28T01:30:00"},
-    {"title": "Global Cyberattack Vulnerability Found in Legacy Enterprise Routers", "author": "sec_researcher", "upvotes": 280, "comment_count": 62, "sentiment_label": "Negative", "sentiment_score": -0.58, "published_at": "2026-07-28T01:15:00"},
-    {"title": "Google Cloud Outage Impacting Multiple Major Services", "author": "cloud_watch", "upvotes": 310, "comment_count": 95, "sentiment_label": "Negative", "sentiment_score": -0.45, "published_at": "2026-07-28T00:45:00"},
-    {"title": "Apple Unveils On-Device Privacy Architecture for VisionOS", "author": "apple_fan", "upvotes": 390, "comment_count": 48, "sentiment_label": "Positive", "sentiment_score": 0.52, "published_at": "2026-07-28T00:30:00"},
-    {"title": "Python 3.13 Released with Experimental Free-Threaded No-GIL Mode", "author": "guido_fan", "upvotes": 540, "comment_count": 112, "sentiment_label": "Positive", "sentiment_score": 0.48, "published_at": "2026-07-27T23:50:00"},
-    {"title": "Major Tech Company Announces 5% Workforce Restructuring", "author": "news_bot", "upvotes": 190, "comment_count": 55, "sentiment_label": "Negative", "sentiment_score": -0.35, "published_at": "2026-07-27T23:10:00"}
+    {"story_id": "1", "title": "NVIDIA Launches Next-Gen Blackwell Ultra Chips for Generative AI", "author": "tech_insider", "upvotes": 450, "comment_count": 85, "sentiment_label": "Positive", "sentiment_score": 0.65, "published_at": "2026-07-28T02:00:00"},
+    {"story_id": "2", "title": "OpenAI Releases GPT-4.5 with Enhanced Reasoning Capabilities", "author": "ai_dev", "upvotes": 620, "comment_count": 140, "sentiment_label": "Positive", "sentiment_score": 0.72, "published_at": "2026-07-28T01:30:00"},
+    {"story_id": "3", "title": "Global Cyberattack Vulnerability Found in Legacy Enterprise Routers", "author": "sec_researcher", "upvotes": 280, "comment_count": 62, "sentiment_label": "Negative", "sentiment_score": -0.58, "published_at": "2026-07-28T01:15:00"},
+    {"story_id": "4", "title": "Google Cloud Outage Impacting Multiple Major Services", "author": "cloud_watch", "upvotes": 310, "comment_count": 95, "sentiment_label": "Negative", "sentiment_score": -0.45, "published_at": "2026-07-28T00:45:00"},
+    {"story_id": "5", "title": "Apple Unveils On-Device Privacy Architecture for VisionOS", "author": "apple_fan", "upvotes": 390, "comment_count": 48, "sentiment_label": "Positive", "sentiment_score": 0.52, "published_at": "2026-07-28T00:30:00"},
+    {"story_id": "6", "title": "Python 3.13 Released with Experimental Free-Threaded No-GIL Mode", "author": "guido_fan", "upvotes": 540, "comment_count": 112, "sentiment_label": "Positive", "sentiment_score": 0.48, "published_at": "2026-07-27T23:50:00"},
+    {"story_id": "7", "title": "Major Tech Company Announces 5% Workforce Restructuring", "author": "news_bot", "upvotes": 190, "comment_count": 55, "sentiment_label": "Negative", "sentiment_score": -0.35, "published_at": "2026-07-27T23:10:00"}
 ]
 
 class AIQueryRequest(BaseModel):
@@ -38,9 +38,13 @@ def fetch_live_fallback():
     try:
         res = requests.get(url, timeout=4)
         if res.status_code == 200:
-            ids = res.json()[:15]
+            ids = res.json()[:20]
             stories = []
+            seen_ids = set()
             for sid in ids:
+                if sid in seen_ids:
+                    continue
+                seen_ids.add(sid)
                 s_res = requests.get(f"https://hacker-news.firebaseio.com/v0/item/{sid}.json", timeout=2)
                 if s_res.status_code == 200:
                     s = s_res.json()
@@ -57,7 +61,8 @@ def fetch_live_fallback():
                             'published_at': pd.Timestamp.now().isoformat()
                         })
             if stories:
-                return pd.DataFrame(stories)
+                df = pd.DataFrame(stories)
+                return df.drop_duplicates(subset=['story_id'], keep='first')
     except Exception:
         pass
     return pd.DataFrame(SAMPLE_STORIES)
@@ -69,7 +74,7 @@ def load_data():
             news_df = conn.execute("SELECT * FROM stg_news ORDER BY published_at DESC").fetchdf()
             conn.close()
             if not news_df.empty:
-                return news_df
+                return news_df.drop_duplicates(subset=['story_id'], keep='first')
         except Exception:
             pass
             
@@ -82,7 +87,7 @@ def load_data():
                 news_df['published_at'] = news_df['created_at']
                 news_df['upvotes'] = news_df['score']
                 news_df['comment_count'] = news_df['comments']
-                return news_df
+                return news_df.drop_duplicates(subset=['story_id'], keep='first')
         except Exception:
             pass
             
@@ -94,6 +99,7 @@ def get_stories(limit: int = 50, sentiment: str = None):
     if df.empty:
         return {"stories": [], "count": 0}
     
+    df = df.drop_duplicates(subset=['story_id'], keep='first')
     if sentiment and sentiment.lower() != 'all':
         df = df[df['sentiment_label'].str.lower() == sentiment.lower()]
         
@@ -106,6 +112,7 @@ def get_analytics():
     if df.empty:
         return {"total_stories": 0, "avg_sentiment": 0, "positive": 0, "neutral": 0, "negative": 0}
     
+    df = df.drop_duplicates(subset=['story_id'], keep='first')
     counts = df['sentiment_label'].value_counts().to_dict()
     return {
         "total_stories": len(df),
@@ -130,6 +137,7 @@ def dashboard_ui():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>NewsSentinel | Market Intelligence Console</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         <style>
             body { background-color: #0e1117; color: #fafafa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
             .card { background-color: #161b22; border: 1px solid #30363d; color: #fafafa; border-radius: 8px; }
@@ -148,7 +156,7 @@ def dashboard_ui():
                     <p class="text-secondary mb-0">HackerNews Live Stream &rarr; Delta Lakehouse &rarr; dbt Analytics &rarr; LangChain AI RAG</p>
                 </div>
                 <div>
-                    <button onclick="refreshDashboard()" class="btn btn-primary">🔄 Refresh Live Data</button>
+                    <button onclick="window.location.reload()" class="btn btn-primary">🔄 Refresh Live Data</button>
                 </div>
             </div>
 
@@ -156,7 +164,7 @@ def dashboard_ui():
             <div class="row g-3 mb-4">
                 <div class="col-md-3">
                     <div class="card p-3">
-                        <small class="text-secondary">Total Live Stories</small>
+                        <small class="text-secondary">Total Unique Live Stories</small>
                         <div id="m-total" class="metric-val text-info">0</div>
                     </div>
                 </div>
@@ -180,7 +188,23 @@ def dashboard_ui():
                 </div>
             </div>
 
-            <!-- PROMINENT LANGCHAIN AI SECTION ON MAIN PAGE -->
+            <!-- Visual Charts Row -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h5 class="card-title">📊 Sentiment Distribution</h5>
+                        <div id="pieChart" style="height: 300px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h5 class="card-title">🔥 Top Upvoted Tech Stories</h5>
+                        <div id="barChart" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PROMINENT LANGCHAIN AI SECTION -->
             <div class="card p-4 mb-4 border-primary">
                 <h4>🤖 LangChain AI Market Intelligence Assistant</h4>
                 <p class="text-secondary">Ask natural language questions to query your live Lakehouse data (e.g., 'top positive news', 'negative risk stories', 'most popular').</p>
@@ -202,7 +226,7 @@ def dashboard_ui():
             <!-- Real-Time News Stream Feed -->
             <div class="card p-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h4>📋 Real-Time News Stream Feed</h4>
+                    <h4>📋 Real-Time News Stream Feed (Deduplicated)</h4>
                     <input type="text" id="searchInput" onkeyup="filterTable()" class="form-control bg-dark text-light border-secondary w-25" placeholder="🔍 Search news titles...">
                 </div>
                 <div class="table-responsive">
@@ -225,7 +249,6 @@ def dashboard_ui():
             </div>
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"></script>
         <script>
             let allStories = [];
 
@@ -239,10 +262,33 @@ def dashboard_ui():
                     document.getElementById('m-pos').innerText = analytics.positive;
                     document.getElementById('m-neg').innerText = analytics.negative;
 
+                    // Plotly Pie Chart
+                    const pieData = [{
+                        values: [analytics.positive, analytics.neutral, analytics.negative],
+                        labels: ['Positive', 'Neutral', 'Negative'],
+                        type: 'pie',
+                        marker: { colors: ['#2ecc71', '#95a5a6', '#e74c3c'] }
+                    }];
+                    const pieLayout = { margin: {t: 10, b: 10, l: 10, r: 10}, paper_bgcolor: 'rgba(0,0,0,0)', font: {color: '#ffffff'} };
+                    Plotly.newPlot('pieChart', pieData, pieLayout);
+
                     const sRes = await fetch('/api/stories?limit=50');
                     const data = await sRes.json();
                     allStories = data.stories;
                     renderTable(allStories);
+
+                    // Plotly Bar Chart
+                    const topStories = [...allStories].sort((a,b) => b.upvotes - a.upvotes).slice(0, 6);
+                    const barData = [{
+                        x: topStories.map(s => s.upvotes),
+                        y: topStories.map(s => s.title.length > 30 ? s.title.substring(0,30) + '...' : s.title),
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: { color: '#58a6ff' }
+                    }];
+                    const barLayout = { margin: {t: 10, b: 30, l: 180, r: 10}, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: {color: '#ffffff'}, yaxis: {autorange: 'reversed'} };
+                    Plotly.newPlot('barChart', barData, barLayout);
+
                 } catch(e) {
                     console.error(e);
                 }
