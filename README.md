@@ -1,19 +1,30 @@
 # NewsSentinel: Real-Time Market & Tech Trend Intelligence Platform
 
-NewsSentinel is a real-time streaming data platform that ingests live tech stories from HackerNews, stores them in a local Delta Lakehouse, cleans and transforms them using dbt, analyzes sentiment with VADER NLP, and provides natural-language market intelligence through a LangChain AI RAG Agent served over a FastAPI web application.
+NewsSentinel is an enterprise-grade real-time streaming data platform that ingests live tech stories from HackerNews, stores them in a local Delta Lakehouse, cleans and transforms them using dbt, analyzes sentiment with VADER NLP, and provides natural-language market intelligence through a LangChain AI RAG Agent served over a FastAPI web application.
 
 ## System Architecture
 
 ```
-[HackerNews Live API] -> [Kafka (Docker)] -> [Delta Lake] -> [dbt + DuckDB] -> [VADER NLP & LangChain] -> [FastAPI Web Console]
+[HackerNews Live API] -> [Kafka (Docker)] -> [Delta Lake] -> [dbt + DuckDB] -> [VADER NLP & LangChain] -> [FastAPI Console]
 ```
 
 ## Problem Solved
 
 Market analysts, product teams, and investors face information overload from thousands of tech articles and company announcements published daily. NewsSentinel solves this by:
-1. Continuous ingestion of live tech news without manual monitoring.
-2. Real-time sentiment scoring (Positive, Neutral, Negative) to spot emerging hype cycles or public backlash.
-3. Conversational AI querying via LangChain so analysts can ask natural questions instead of writing SQL.
+1. **Automated Stream Ingestion**: Continuous ingestion of live tech news without manual monitoring.
+2. **Real-Time Sentiment Analytics**: Real-time VADER NLP sentiment scoring (Positive, Neutral, Negative) to spot emerging hype cycles or public backlash.
+3. **Conversational AI RAG**: Natural language querying via LangChain so non-technical users can ask questions instead of writing SQL.
+
+---
+
+## Dashboard Features & Preview
+
+- **Executive KPI Metrics**: Live count of total unique stories, average sentiment compound score, positive market signals, and negative risk indicators.
+- **Interactive Visual Analytics**:
+  - **Sentiment Distribution Donut Chart**: Breakdown of market sentiment proportions (Positive / Neutral / Negative).
+  - **Top Upvoted Tech Stories Bar Chart**: Ranking of top-trending tech stories by community engagement score.
+- **LangChain AI Market Assistant**: Conversational agent answering ad-hoc queries like *"Show top positive tech news"* or *"Any negative risk stories?"*.
+- **Real-Time News Feed Table**: Searchable, deduplicated live news feed table displaying authors, upvotes, comment counts, and VADER sentiment classification badges.
 
 ---
 
@@ -76,11 +87,11 @@ dbt test --profiles-dir .
 cd ..
 ```
 
-### 6. Launch FastAPI Web Console & Swagger Docs
+### 6. Launch FastAPI Console & Swagger Docs
 Open **Terminal 4**:
 ```bash
 python src/main.py
 ```
 Open your browser at:
-- **Analyst Web Dashboard**: `http://localhost:8000`
-- **Interactive OpenAPI Specs**: `http://localhost:8000/docs`
+- **Analyst Web Console**: `http://127.0.0.1:8000`
+- **Interactive OpenAPI Specs**: `http://127.0.0.1:8000/docs`
