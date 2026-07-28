@@ -59,7 +59,7 @@ def query_database(user_query):
         
     rows = []
     for _, r in filtered.iterrows():
-        rows.append(f"• **[{r['sentiment_label']}]** {r['title']} *(Upvotes: {r['upvotes']})*")
+        rows.append(f"• [{r['sentiment_label']}] {r['title']} (Upvotes: {r['upvotes']})")
         
     summary_text = "\n".join(rows)
     
@@ -71,15 +71,15 @@ def query_database(user_query):
             llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_KEY)
             prompt = PromptTemplate(
                 input_variables=["query", "data"],
-                template="You are NewsSentinel AI Market Intelligence Agent. Answer the analyst query concisely.\n\nQuery: {query}\n\nLive Stories Data:\n{data}\n\nSummary:"
+                template="You are NewsSentinel AI Market Analyst. Provide a clean summary without markdown asterisks (**).\n\nQuery: {query}\n\nData:\n{data}\n\nSummary:"
             )
-            chain = prompt | llm
-            res = chain.invoke({"query": user_query, "data": summary_text})
-            return res.content
+            res = (prompt | llm).invoke({"query": user_query, "data": summary_text})
+            clean_res = res.content.replace("**", "").replace("###", "").replace("*", "")
+            return clean_res
         except Exception:
             pass
             
-    return f"### 🤖 LangChain AI Market Intelligence Summary\n\n**Query:** *{user_query}*\n\n{summary_text}"
+    return f"LangChain Market Intelligence Summary for '{user_query}':\n\n{summary_text}"
 
 if __name__ == "__main__":
     print(query_database("Show top positive tech news"))
