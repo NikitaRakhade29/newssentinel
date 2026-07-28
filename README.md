@@ -8,16 +8,11 @@ NewsSentinel is an enterprise-grade real-time streaming data platform that inges
 [HackerNews Live API] -> [Kafka (Docker)] -> [Delta Lake] -> [dbt + DuckDB] -> [VADER NLP & LangChain] -> [FastAPI Console]
 ```
 
-## Problem Solved
-
-Market analysts, product teams, and investors face information overload from thousands of tech articles and company announcements published daily. NewsSentinel solves this by:
-1. **Automated Stream Ingestion**: Continuous ingestion of live tech news without manual monitoring.
-2. **Real-Time Sentiment Analytics**: Real-time VADER NLP sentiment scoring (Positive, Neutral, Negative) to spot emerging hype cycles or public backlash.
-3. **Conversational AI RAG**: Natural language querying via LangChain so non-technical users can ask questions instead of writing SQL.
-
 ---
 
-## Dashboard Features & Preview
+## Dashboard Preview & Features
+
+![NewsSentinel Market Intelligence Console](docs/images/dashboard_preview.svg)
 
 - **Executive KPI Metrics**: Live count of total unique stories, average sentiment compound score, positive market signals, and negative risk indicators.
 - **Interactive Visual Analytics**:
