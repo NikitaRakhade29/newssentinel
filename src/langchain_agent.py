@@ -9,7 +9,7 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 DB_PATH = "newssentinel.duckdb"
 DELTA_PATH = "./data/bronze_news"
 
-SAMPLE_STORIES = [
+DEFAULT_STORIES = [
     {"title": "NVIDIA Launches Next-Gen Blackwell Ultra Chips for Generative AI", "author": "tech_insider", "upvotes": 450, "sentiment_label": "Positive", "sentiment_score": 0.65},
     {"title": "OpenAI Releases GPT-4.5 with Enhanced Reasoning Capabilities", "author": "ai_dev", "upvotes": 620, "sentiment_label": "Positive", "sentiment_score": 0.72},
     {"title": "Global Cyberattack Vulnerability Found in Legacy Enterprise Routers", "author": "sec_researcher", "upvotes": 280, "sentiment_label": "Negative", "sentiment_score": -0.58},
@@ -19,54 +19,74 @@ SAMPLE_STORIES = [
     {"title": "Major Tech Company Announces 5% Workforce Restructuring", "author": "news_bot", "upvotes": 190, "sentiment_label": "Negative", "sentiment_score": -0.35}
 ]
 
-def query_database(user_query):
-    query_str = user_query.strip()
-    query_lower = query_str.lower()
+def load_all_stories():
+    stories = []
     
-    # Load dataset from DuckDB, Delta Lake, or Sample
-    df = pd.DataFrame()
+    # Check DuckDB
     if os.path.exists(DB_PATH):
         try:
             conn = duckdb.connect(DB_PATH, read_only=True)
             df = conn.execute("SELECT * FROM stg_news").fetchdf()
             conn.close()
+            if not df.empty:
+                return df
         except Exception:
             pass
             
-    if df.empty and os.path.exists(DELTA_PATH):
+    # Check Delta Lake Parquet
+    if os.path.exists(DELTA_PATH):
         try:
             conn = duckdb.connect()
             df = conn.execute(f"SELECT * FROM read_parquet('{DELTA_PATH}/*.parquet')").fetchdf()
             conn.close()
             if not df.empty:
                 df['upvotes'] = df['score']
+                return df
         except Exception:
             pass
             
+    return pd.DataFrame(DEFAULT_STORIES)
+
+def query_database(user_query):
+    query_str = user_query.strip()
+    query_lower = query_str.lower()
+    
+    df = load_all_stories()
     if df.empty:
-        df = pd.DataFrame(SAMPLE_STORIES)
+        df = pd.DataFrame(DEFAULT_STORIES)
         
-    # Search logic: check exact keyword in title first
+    # Search logic
     if "positive" in query_lower:
-        filtered = df[df['sentiment_label'] == 'Positive'].sort_values('upvotes', ascending=False).head(5)
+        matched = df[df['sentiment_label'] == 'Positive']
     elif "negative" in query_lower or "risk" in query_lower:
-        filtered = df[df['sentiment_label'] == 'Negative'].sort_values('upvotes', ascending=False).head(5)
+        matched = df[df['sentiment_label'] == 'Negative']
     elif "top" in query_lower or "popular" in query_lower or "upvote" in query_lower:
-        filtered = df.sort_values('upvotes', ascending=False).head(5)
+        matched = df.sort_values('upvotes', ascending=False)
     else:
-        # Search title for user keyword
         matched = df[df['title'].str.contains(query_lower, case=False, na=False)]
-        if not matched.empty:
-            filtered = matched.sort_values('upvotes', ascending=False).head(5)
-        else:
-            return f"No news stories found matching keyword '{query_str}'.\n\nTry searching for topics like: 'AI', 'NVIDIA', 'Cloud', 'Apple', 'Python', 'Positive', 'Negative', or 'Top News'."
-            
+        
+    # If no match in current dataset, fallback to top stories and explain
+    if matched.empty:
+        matched = df.head(5)
+        is_fallback = True
+    else:
+        is_fallback = False
+
+    filtered = matched.head(5)
+    
     rows = []
     for idx, (_, r) in enumerate(filtered.iterrows(), start=1):
-        label_str = "Positive Market Signal" if r['sentiment_label'] == 'Positive' else ("Negative Risk Factor" if r['sentiment_label'] == 'Negative' else "Neutral Insight")
-        rows.append(f"{idx}. [{label_str}] {r['title']} (Community Engagement: {r['upvotes']} upvotes).")
+        upvotes_val = r.get('upvotes', r.get('score', 100))
+        rows.append(f"{idx}. [{r['sentiment_label']}] {r['title']} (Upvotes: {upvotes_val})")
         
     summary_text = "\n".join(rows)
+    
+    if is_fallback:
+        header = f"No direct match for '{query_str}' in current stories stream. Displaying top trending market news:\n"
+    else:
+        header = f"Market Intelligence Briefing for '{query_str}':\n"
+        
+    final_output = f"{header}\n{summary_text}"
     
     if GEMINI_KEY and GEMINI_KEY != "your_free_gemini_api_key_here":
         try:
@@ -76,7 +96,7 @@ def query_database(user_query):
             llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_KEY)
             prompt = PromptTemplate(
                 input_variables=["query", "data"],
-                template="You are NewsSentinel AI Market Analyst. Rewrite the following market findings into clean, professional, human-readable bullet sentences.\n\nQuery: {query}\n\nData:\n{data}\n\nSummary:"
+                template="You are NewsSentinel AI Market Analyst. Provide a clean summary without markdown asterisks (**).\n\nQuery: {query}\n\nData:\n{data}\n\nSummary:"
             )
             res = (prompt | llm).invoke({"query": query_str, "data": summary_text})
             clean_res = res.content.replace("**", "").replace("###", "").replace("*", "")
@@ -84,9 +104,9 @@ def query_database(user_query):
         except Exception:
             pass
             
-    return f"Market Intelligence Briefing for '{query_str}':\n\n{summary_text}"
+    return final_output
 
 if __name__ == "__main__":
-    print(query_database("moon"))
+    print(query_database("NVIDIA"))
     print("---")
-    print(query_database("AI"))
+    print(query_database("moon"))
